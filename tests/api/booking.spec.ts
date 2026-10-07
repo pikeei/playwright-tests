@@ -1,5 +1,13 @@
 import { test, expect } from '@playwright/test';
-import { bookingPayload, createBooking, deleteBooking, getToken } from './helpers';
+import {
+  bookingPayload,
+  createBooking,
+  deleteBooking,
+  expectBookingListItem,
+  expectBookingRecord,
+  expectCreateBookingResponse,
+  getToken,
+} from './helpers';
 
 test.describe('GET /booking', () => {
   test('returns a list of booking ids', async ({ request }) => {
@@ -8,7 +16,7 @@ test.describe('GET /booking', () => {
     const list = await res.json();
     expect(Array.isArray(list)).toBe(true);
     expect(list.length).toBeGreaterThan(0);
-    expect(list[0]).toHaveProperty('bookingid');
+    expectBookingListItem(list[0]);
   });
 
   test('can filter by firstname', async ({ request }) => {
@@ -17,8 +25,10 @@ test.describe('GET /booking', () => {
     try {
       const res = await request.get('/booking', { params: { firstname: unique } });
       expect(res.status()).toBe(200);
-      const ids = (await res.json()).map((b: { bookingid: number }) => b.bookingid);
+      const list = await res.json();
+      const ids = list.map((b: { bookingid: number }) => b.bookingid);
       expect(ids).toContain(id);
+      list.forEach((item: unknown) => expectBookingListItem(item));
     } finally {
       await deleteBooking(request, id);
     }
@@ -36,8 +46,7 @@ test.describe('POST /booking', () => {
     const res = await request.post('/booking', { data: payload });
     expect(res.status()).toBe(200);
     const body = await res.json();
-    expect(typeof body.bookingid).toBe('number');
-    expect(body.booking).toMatchObject(payload);
+    expectCreateBookingResponse(body, payload);
     await deleteBooking(request, body.bookingid);
   });
 
@@ -46,7 +55,8 @@ test.describe('POST /booking', () => {
     try {
       const res = await request.get(`/booking/${id}`);
       expect(res.status()).toBe(200);
-      expect(await res.json()).toEqual(booking);
+      const body = await res.json();
+      expectBookingRecord(body, booking);
     } finally {
       await deleteBooking(request, id);
     }
@@ -74,7 +84,8 @@ test.describe('PUT / PATCH /booking/:id', () => {
         headers: { Cookie: `token=${token}` },
       });
       expect(res.status()).toBe(200);
-      expect(await res.json()).toMatchObject(updated);
+      const body = await res.json();
+      expectBookingRecord(body, updated);
     } finally {
       await deleteBooking(request, id);
     }
@@ -89,8 +100,10 @@ test.describe('PUT / PATCH /booking/:id', () => {
       });
       expect(res.status()).toBe(200);
       const body = await res.json();
-      expect(body.firstname).toBe('Patched');
-      expect(body.lastname).toBe('Keeper');
+      expectBookingRecord(body, {
+        firstname: 'Patched',
+        lastname: 'Keeper',
+      });
     } finally {
       await deleteBooking(request, id);
     }

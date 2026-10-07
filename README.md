@@ -26,9 +26,3 @@ npm run report       # open the HTML report
 - Restful-booker is a shared public API that resets often and has deliberate bugs. Each test creates and deletes its own booking so tests don't depend on existing data.
 - If a test fails on that API, check the bug yourself against the docs before assuming your test is wrong.
 - Quirks worth noticing: bad login returns 200 with a `reason`, and DELETE returns 201.
-
-## Practice ideas
-- Add a Page Object for the todo page.
-- Add schema checks for booking responses.
-- Try `page.route` on the UI to mock or block requests.
-- Write tests for the booking `checkin` / `checkout` filters and see what the API actually does.
