@@ -1,125 +1,128 @@
-import { test, expect, Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
+import { TodoPage } from './todo-page';
 
 const TODOS = ['buy some cheese', 'feed the cat', 'book a doctors appointment'];
 
-async function addTodos(page: Page, items: string[]) {
-  const input = page.getByPlaceholder('What needs to be done?');
-  for (const item of items) {
-    await input.fill(item);
-    await input.press('Enter');
-  }
-}
-
 test.beforeEach(async ({ page }) => {
-  await page.goto('/todomvc');
+  const todoPage = new TodoPage(page);
+  await todoPage.goto();
 });
 
 test.describe('Adding todos', () => {
   test('starts with an empty list', async ({ page }) => {
-    await expect(page.getByTestId('todo-item')).toHaveCount(0);
+    const todoPage = new TodoPage(page);
+    await expect(todoPage.todoItems).toHaveCount(0);
   });
 
   test('adds a single todo and clears the input', async ({ page }) => {
-    await addTodos(page, [TODOS[0]]);
-    await expect(page.getByTestId('todo-title')).toHaveText([TODOS[0]]);
-    await expect(page.getByPlaceholder('What needs to be done?')).toBeEmpty();
+    const todoPage = new TodoPage(page);
+    await todoPage.addTodos([TODOS[0]]);
+    await todoPage.expectTodoTitles([TODOS[0]]);
+    await expect(todoPage.newTodoInput).toBeEmpty();
   });
 
   test('adds multiple todos and shows the count', async ({ page }) => {
-    await addTodos(page, TODOS);
-    await expect(page.getByTestId('todo-title')).toHaveText(TODOS);
-    await expect(page.getByTestId('todo-count')).toHaveText('3 items left');
+    const todoPage = new TodoPage(page);
+    await todoPage.addTodos(TODOS);
+    await todoPage.expectTodoTitles(TODOS);
+    await todoPage.expectCount('3 items left');
   });
 
   test('trims whitespace around new todos', async ({ page }) => {
-    await addTodos(page, ['    buy some cheese   ']);
-    await expect(page.getByTestId('todo-title')).toHaveText(['buy some cheese']);
+    const todoPage = new TodoPage(page);
+    await todoPage.addTodos(['    buy some cheese   ']);
+    await todoPage.expectTodoTitles(['buy some cheese']);
   });
 });
 
 test.describe('Completing and deleting', () => {
-  test.beforeEach(async ({ page }) => addTodos(page, TODOS));
+  test.beforeEach(async ({ page }) => {
+    const todoPage = new TodoPage(page);
+    await todoPage.addTodos(TODOS);
+  });
 
   test('marks a todo as completed', async ({ page }) => {
-    const first = page.getByTestId('todo-item').first();
-    await first.getByRole('checkbox').check();
+    const todoPage = new TodoPage(page);
+    const first = todoPage.todoItems.first();
+    await todoPage.markTodoComplete(0);
     await expect(first).toHaveClass(/completed/);
-    await expect(page.getByTestId('todo-count')).toHaveText('2 items left');
+    await todoPage.expectCount('2 items left');
   });
 
   test('un-completes a todo', async ({ page }) => {
-    const first = page.getByTestId('todo-item').first();
-    await first.getByRole('checkbox').check();
-    await first.getByRole('checkbox').uncheck();
+    const todoPage = new TodoPage(page);
+    const first = todoPage.todoItems.first();
+    await todoPage.markTodoComplete(0);
+    await todoPage.markTodoIncomplete(0);
     await expect(first).not.toHaveClass(/completed/);
   });
 
   test('"mark all as complete" completes everything', async ({ page }) => {
-    await page.getByLabel('Mark all as complete').check();
-    await expect(page.getByTestId('todo-item')).toHaveClass(['completed', 'completed', 'completed']);
+    const todoPage = new TodoPage(page);
+    await todoPage.markAllComplete();
+    await expect(todoPage.todoItems).toHaveClass(['completed', 'completed', 'completed']);
   });
 
   test('deletes a todo', async ({ page }) => {
-    const second = page.getByTestId('todo-item').nth(1);
-    await second.hover();
-    await second.locator('.destroy').click();
-    await expect(page.getByTestId('todo-title')).toHaveText([TODOS[0], TODOS[2]]);
+    const todoPage = new TodoPage(page);
+    await todoPage.deleteTodo(1);
+    await todoPage.expectTodoTitles([TODOS[0], TODOS[2]]);
   });
 
   test('"Clear completed" removes only completed todos', async ({ page }) => {
-    await page.getByTestId('todo-item').first().getByRole('checkbox').check();
-    await page.getByRole('button', { name: 'Clear completed' }).click();
-    await expect(page.getByTestId('todo-title')).toHaveText([TODOS[1], TODOS[2]]);
+    const todoPage = new TodoPage(page);
+    await todoPage.markTodoComplete(0);
+    await todoPage.clearCompleted();
+    await todoPage.expectTodoTitles([TODOS[1], TODOS[2]]);
   });
 });
 
 test.describe('Editing', () => {
   test('edits a todo by double-clicking it', async ({ page }) => {
-    await addTodos(page, TODOS);
-    const item = page.getByTestId('todo-item').nth(1);
-    await item.getByTestId('todo-title').dblclick();
-    const editor = item.getByRole('textbox', { name: 'Edit' });
-    await editor.fill('buy some sausages');
-    await editor.press('Enter');
-    await expect(page.getByTestId('todo-title')).toHaveText([TODOS[0], 'buy some sausages', TODOS[2]]);
+    const todoPage = new TodoPage(page);
+    await todoPage.addTodos(TODOS);
+    await todoPage.editTodo(1, 'buy some sausages');
+    await todoPage.expectTodoTitles([TODOS[0], 'buy some sausages', TODOS[2]]);
   });
 
   test('pressing Escape cancels an edit', async ({ page }) => {
-    await addTodos(page, TODOS);
-    const item = page.getByTestId('todo-item').nth(1);
-    await item.getByTestId('todo-title').dblclick();
-    const editor = item.getByRole('textbox', { name: 'Edit' });
-    await editor.fill('this will be discarded');
-    await editor.press('Escape');
-    await expect(page.getByTestId('todo-title')).toHaveText(TODOS);
+    const todoPage = new TodoPage(page);
+    await todoPage.addTodos(TODOS);
+    await todoPage.cancelEdit(1, 'this will be discarded');
+    await todoPage.expectTodoTitles(TODOS);
   });
 });
 
 test.describe('Filters and persistence', () => {
   test.beforeEach(async ({ page }) => {
-    await addTodos(page, TODOS);
-    await page.getByTestId('todo-item').nth(1).getByRole('checkbox').check();
+    const todoPage = new TodoPage(page);
+    await todoPage.addTodos(TODOS);
+    await todoPage.markTodoComplete(1);
   });
 
   test('Active filter shows only incomplete todos', async ({ page }) => {
-    await page.getByRole('link', { name: 'Active' }).click();
-    await expect(page.getByTestId('todo-title')).toHaveText([TODOS[0], TODOS[2]]);
+    const todoPage = new TodoPage(page);
+    await todoPage.filter('Active');
+    await todoPage.expectTodoTitles([TODOS[0], TODOS[2]]);
   });
 
   test('Completed filter shows only completed todos', async ({ page }) => {
-    await page.getByRole('link', { name: 'Completed' }).click();
-    await expect(page.getByTestId('todo-title')).toHaveText([TODOS[1]]);
+    const todoPage = new TodoPage(page);
+    await todoPage.filter('Completed');
+    await todoPage.expectTodoTitles([TODOS[1]]);
   });
 
   test('All filter shows everything again', async ({ page }) => {
-    await page.getByRole('link', { name: 'Completed' }).click();
-    await page.getByRole('link', { name: 'All' }).click();
-    await expect(page.getByTestId('todo-title')).toHaveText(TODOS);
+    const todoPage = new TodoPage(page);
+    await todoPage.filter('Completed');
+    await todoPage.filter('All');
+    await todoPage.expectTodoTitles(TODOS);
   });
 
   test('todos survive a page reload (localStorage)', async ({ page }) => {
+    const todoPage = new TodoPage(page);
     await page.reload();
-    await expect(page.getByTestId('todo-title')).toHaveText(TODOS);
-    await expect(page.getByTestId('todo-item').nth(1)).toHaveClass(/completed/);
+    await todoPage.expectTodoTitles(TODOS);
+    await expect(todoPage.todoItems.nth(1)).toHaveClass(/completed/);
   });
 });
