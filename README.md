@@ -22,7 +22,3 @@ npm run test:headed  # watch the browser
 npm run report       # open the HTML report
 ```
 
-## Notes
-- Restful-booker is a shared public API that resets often and has deliberate bugs. Each test creates and deletes its own booking so tests don't depend on existing data.
-- If a test fails on that API, check the bug yourself against the docs before assuming your test is wrong.
-- Quirks worth noticing: bad login returns 200 with a `reason`, and DELETE returns 201.
